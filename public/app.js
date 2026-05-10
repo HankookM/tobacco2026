@@ -14,6 +14,8 @@ const API = (typeof window !== 'undefined' && window.__API_BASE__)
 const $  = (sel, root=document) => root.querySelector(sel);
 const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
 const fmtKRW = (n) => '₩' + (Number(n)||0).toLocaleString('ko-KR');
+// 발주 화면 전용 단가 표시 — 0 한 자리 제거 (÷10)
+const fmtKRWOrder = (n) => '₩' + Math.round((Number(n)||0)/10).toLocaleString('ko-KR');
 const fmtNum = (n) => (Number(n)||0).toLocaleString('ko-KR');
 const todayKR = () => {
   const d = new Date(Date.now() + 9*3600*1000);
@@ -369,7 +371,7 @@ function renderOrderMode() {
           '<td class="px-3 py-2 text-center">' +
             '<input type="number" min="0" value="' + val + '" data-order-id="' + s.id + '" placeholder="0" ' +
             'class="qty-input w-20 px-2 py-1.5 rounded-lg border border-slate-300 text-center font-mono"></td>' +
-          '<td class="px-3 py-2 text-right text-slate-500">' + fmtKRW(s.priceCarton) + '</td>' +
+          '<td class="px-3 py-2 text-right text-slate-500">' + fmtKRWOrder(s.priceCarton) + '</td>' +
         '</tr>';
       }).join('');
       const sum = groups[maker].reduce((a,s) => a + (Number(state.orderQty[s.id])||0), 0);
@@ -580,7 +582,13 @@ $('#order-export').addEventListener('click', () => {
   items.sort((a,b) => (a.maker||'').localeCompare(b.maker||'','ko') || a.name.localeCompare(b.name,'ko'));
   const rows = [['제조사','상품명','상품ID','발주(보루)','단가(보루)','금액']];
   let total = 0;
-  items.forEach(s => { const q = Number(state.orderQty[s.id])||0; const amt = q*(Number(s.priceCarton)||0); total += amt; rows.push([s.maker||'', s.name, s.id, q, s.priceCarton||0, amt]); });
+  items.forEach(s => {
+    const q = Number(state.orderQty[s.id])||0;
+    const unit = Math.round((Number(s.priceCarton)||0)/10); // 0 하나 제거
+    const amt = q*unit;
+    total += amt;
+    rows.push([s.maker||'', s.name, s.id, q, unit, amt]);
+  });
   rows.push(['','','합계','','', total]);
   const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(',')).join('\r\n');
   const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
@@ -610,9 +618,10 @@ $('#order-print').addEventListener('click', () => {
     html += '<h2>' + m + '</h2><table><thead><tr><th>상품명</th><th class="c">발주(보루)</th><th class="r">단가</th><th class="r">금액</th></tr></thead><tbody>';
     groups[m].forEach(s => {
       const q = Number(state.orderQty[s.id])||0;
-      const amt = q*(Number(s.priceCarton)||0);
+      const unitPrice = Math.round((Number(s.priceCarton)||0)/10); // 0 하나 제거
+      const amt = q*unitPrice;
       sub += amt; subCt += q; total += amt; totalCt += q;
-      html += '<tr><td>' + s.name + '</td><td class="c">' + q + '</td><td class="r">' + fmtKRW(s.priceCarton) + '</td><td class="r">' + fmtKRW(amt) + '</td></tr>';
+      html += '<tr><td>' + s.name + '</td><td class="c">' + q + '</td><td class="r">' + fmtKRW(unitPrice) + '</td><td class="r">' + fmtKRW(amt) + '</td></tr>';
     });
     html += '</tbody><tfoot><tr><td>소계</td><td class="c">' + subCt + '</td><td></td><td class="r">' + fmtKRW(sub) + '</td></tr></tfoot></table>';
   });
@@ -634,7 +643,7 @@ $('#audit-apply').addEventListener('click', async () => {
     confirmedCount++;
     const d = calcAuditDiff(s);
     if (d !== null && d !== 0) {
-      ops.push({ productId: s.id, type: '재고조정', unit: '단일', qty: d, memo: '재고조사 차이 자동조정 ' + todayKR() });
+      ops.push({ productId: s.id, type: '조정', unit: '단일', qty: d, memo: '재고조사 차이 자동조정 ' + todayKR() });
     }
   });
   if (!confirmedCount) return toast('확정한 상품이 없습니다. 실재고를 입력하고 확정 체크박스를 켜주세요.', 'warn');

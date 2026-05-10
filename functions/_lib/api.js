@@ -91,9 +91,18 @@ async function getStockSummary(env) {
   for (const i of inout) {
     if (!map[i.productId]) continue;
     const units = i.unit === '보루' ? i.qty * BORU : i.qty;
-    if (i.type === '입고') { map[i.productId].stockUnits += units; map[i.productId].in += units; }
-    else if (i.type === '반품' || i.type === '출고조정') { map[i.productId].stockUnits -= units; map[i.productId].adj -= units; }
-    else if (i.type === '재고조정') { map[i.productId].stockUnits += units; map[i.productId].adj += units; }
+    const t = i.type;
+    // 새 구분(입고/판매/반품/조정) + 이전 구분(출고조정/재고조정) 호환
+    if (t === '입고') {
+      map[i.productId].stockUnits += units; map[i.productId].in += units;
+    } else if (t === '판매') {
+      map[i.productId].stockUnits -= units; map[i.productId].sold += units;
+    } else if (t === '반품' || t === '출고조정') {
+      map[i.productId].stockUnits -= units; map[i.productId].adj -= units;
+    } else if (t === '조정' || t === '재고조정') {
+      // qty 자체가 +/- 되어 있으므로 units를 그대로 더함 (차이만큼 가감)
+      map[i.productId].stockUnits += units; map[i.productId].adj += units;
+    }
   }
   return Object.values(map).map((p) => {
     const carton = Math.floor(p.stockUnits / BORU);
@@ -259,8 +268,8 @@ async function appendSales(env, items) {
       let carton = s.stockCarton;
       let safety = 0;
       while (single <= 0 && carton > 0 && safety < 100) {
-        autoRows.push([ts, s.id, s.name, '재고조정', '보루', -1, '[자동환산] 갑 부족분 자동변환']);
-        autoRows.push([ts, s.id, s.name, '재고조정', '단일', 10, '[자동환산] 보루 1개 풀어 갑 +10']);
+        autoRows.push([ts, s.id, s.name, '조정', '보루', -1, '[자동환산] 갑 부족분 자동변환']);
+        autoRows.push([ts, s.id, s.name, '조정', '단일', 10, '[자동환산] 보루 1개 풀어 갑 +10']);
         carton -= 1; single += 10;
         safety++; autoConvertCount++;
       }
