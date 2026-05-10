@@ -636,6 +636,12 @@
   </div>
 </div>
 
-<script src="/app.js?v=7"></script>
+<!-- Cloudflare Pages 배포 시 API 서버 URL을 여기서 설정. 같은 도메인이라면 빈 값으로 두면 됨. -->
+<script>
+  // 예: window.__API_BASE__ = "https://tobacco2026-api.<계정>.workers.dev";
+  // 또는 Cloudflare Pages 대시보드에서 Custom domain 라우팅 사용 시 빈 값 유지
+  window.__API_BASE__ = window.__API_BASE__ || "";
+</script>
+<script src="/app.js?v=8"></script>
 </body>
 </html>

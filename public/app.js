@@ -1,8 +1,14 @@
 // ===== 담배2026 재고관리 SPA v2 =====
 // 시트는 그대로 "단일"을 쓰고, UI에서만 "갑"으로 표시합니다.
-// API 베이스: 로컬에서는 ''으로, publish 시에는 __PORT_5000__이 치환됨.
+//
+// API 베이스 결정 우선순위:
+// 1) window.__API_BASE__ (index.html에서 설정 가능 — Cloudflare Pages 용)
+// 2) __PORT_5000__ 치환 토큰 (Perplexity publish_website)
+// 3) 빈 문자열 (로컬/같은 도메인)
 const RAW_API = "__PORT_5000__";
-const API = RAW_API.indexOf("__PORT_") === 0 ? "" : RAW_API;
+const API = (typeof window !== 'undefined' && window.__API_BASE__)
+  ? String(window.__API_BASE__).replace(/\/$/, '')
+  : (RAW_API.indexOf("__PORT_") === 0 ? "" : RAW_API);
 
 // ----- 유틸 -----
 const $  = (sel, root=document) => root.querySelector(sel);

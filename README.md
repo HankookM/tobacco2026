@@ -131,7 +131,65 @@ webapp/
 
 ---
 
-## 7. Render.com 배포 (권장 호스팅)
+## 7. Cloudflare Pages 배포 (권장)
+
+정적(프론트) + Pages Functions(백엔드)를 **동일 도메인**에서 서빙하는 구조입니다. CORS 없음, 슬립 없음, 무료 플랜 있음.
+
+### 1) GitHub 연결
+
+1. [Cloudflare Dashboard](https://dash.cloudflare.com/) 접속 → 좌측 **Workers & Pages**
+2. **Create application** → **Pages** 탭 → **Connect to Git**
+3. GitHub 계정 연결 → `HankookM/tobacco2026` 저장소 선택 → **Begin setup**
+
+### 2) 빌드 설정
+
+| 항목 | 값 |
+| --- | --- |
+| Project name | `tobacco2026` (또는 원하는 이름) |
+| Production branch | `main` |
+| Framework preset | **None** |
+| Build command | (비움) |
+| Build output directory | `public` |
+| Root directory | (비움 — 기본값) |
+
+주의: 이 레포의 루트에 `package.json`이 있으니 Cloudflare가 Node 설치를 시도할 수 있습니다. 빌드 명령은 비워두면 OK.
+
+### 3) 환경 변수 설정
+
+Pages 프로젝트 생성 후 **Settings → Environment variables → Production**에서:
+
+| Variable name | Value | Type |
+| --- | --- | --- |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | 서비스 계정 JSON 파일 전체 내용 (한 줄로) | **Encrypt** 체크 |
+| `SPREADSHEET_ID` | `1Bfzg3V3GwprCaBUtZuHREWwdxnwR72nAxBBjQ_ZjrFw` | Plaintext |
+
+저장 후 **Save and deploy** 클릭.
+
+### 4) 배포 확인
+
+- 1회 차 빌드 완료 후 URL: `https://tobacco2026.pages.dev` (자동 부여)
+- `https://tobacco2026.pages.dev/api/health` → `{"ok":true,"auth":"service-account","runtime":"cloudflare-workers"}` 으면 성공
+- 루트 URL 접속 → 앱 화면 표시
+
+### 5) 커스텀 도메인 (선택)
+
+본인 도메인을 Cloudflare에 올린 상태라면 Pages 프로젝트 → **Custom domains** 탭에서 추가 가능.
+
+### 구조 설명
+
+```
+webapp/
+├─ public/                  ← 정적 자산 (Pages가 서빙)
+├─ functions/api/[[catchall]].js   ← 모든 /api/* 요청 처리
+├─ functions/_lib/api.js    ← 라우팅 + 비즈니스 로직
+└─ functions/_lib/sheets.js ← Google Sheets API 클라이언트 (JWT 서명)
+```
+
+동일 도메인이라 CORS 불필요, 슬립 없음, 전세계 CDN 엣지로 읽기 요청 빠름.
+
+---
+
+## 8. Render.com 배포 (대안)
 
 ### 1) 저장소 연결
 

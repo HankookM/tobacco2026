@@ -1,0 +1,11 @@
+name = "tobacco2026-api"
+main = "src/index.js"
+compatibility_date = "2024-12-01"
+
+# 일반 환경변수
+[vars]
+SPREADSHEET_ID = "1Bfzg3V3GwprCaBUtZuHREWwdxnwR72nAxBBjQ_ZjrFw"
+
+# 시크릿(서비스 계정 JSON)은 wrangler secret put 으로 등록:
+#   cd workers && npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_JSON
+# 또는 Cloudflare Dashboard → Workers → Settings → Variables → Encrypt
