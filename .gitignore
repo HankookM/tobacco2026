@@ -1,0 +1,13 @@
+node_modules/
+secrets/
+credentials.json
+*.credentials.json
+service-account*.json
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+dist/
+.vercel/
+.cache/

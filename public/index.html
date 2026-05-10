@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>담배2026 재고관리</title>
+<meta name="theme-color" content="#0f172a" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect rx='12' width='64' height='64' fill='%230f172a'/><text x='50%25' y='58%25' font-family='ui-sans-serif,system-ui' font-size='34' font-weight='800' fill='%2338bdf8' text-anchor='middle'>담</text></svg>" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Pretendard','ui-sans-serif','system-ui','-apple-system','Segoe UI','Roboto','Apple SD Gothic Neo','Noto Sans KR','sans-serif'] },
+        colors: {
+          ink: { 950:'#0b1220', 900:'#0f172a', 800:'#111c33', 700:'#1f2a44' },
+          accent: { 400:'#38bdf8', 500:'#0ea5e9', 600:'#0284c7' }
+        }
+      }
+    }
+  }
+</script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+<style>
+  html,body { background:#f8fafc; }
+  .tab-btn[aria-selected="true"]{ background:#0f172a; color:#fff; }
+  .subtab-btn[aria-selected="true"]{ background:#0f172a; color:#fff; }
+  .chip { display:inline-flex; align-items:center; gap:.25rem; padding:.125rem .5rem; border-radius:9999px; font-size:.7rem; font-weight:600; }
+  .scroll-x::-webkit-scrollbar{ height:6px } .scroll-x::-webkit-scrollbar-thumb{ background:#cbd5e1; border-radius:3px }
+  table.zebra tbody tr:nth-child(odd){ background:#f8fafc }
+  input, select, textarea { font-size:16px }
+  @keyframes pulseRing { 0%{box-shadow:0 0 0 0 rgba(56,189,248,.6)} 70%{box-shadow:0 0 0 14px rgba(56,189,248,0)} 100%{box-shadow:0 0 0 0 rgba(56,189,248,0)} }
+  .ring-pulse { animation: pulseRing 1.6s ease-out infinite; }
+  details > summary { list-style: none; cursor:pointer; }
+  details > summary::-webkit-details-marker { display:none; }
+  .mode-btn { color:#475569; }
+  .mode-btn[aria-selected="true"]{ background:#0f172a; color:#fff; }
+  .mode-btn:not([aria-selected="true"]):hover{ background:#f1f5f9; }
+  #stock-body tr, #audit-body tr, #dash-body tr { border-bottom:1px solid #e2e8f0; }
+  #stock-body tr:hover, #audit-body tr:hover, #dash-body tr:hover { background:#f8fafc; }
+  tr.row-low td:first-child { box-shadow: inset 4px 0 0 #f59e0b; }
+  tr.row-out td:first-child { box-shadow: inset 4px 0 0 #ef4444; }
+  .qty-input { width:64px; text-align:center; padding:.4rem; border:1px solid #cbd5e1; border-radius:.5rem; }
+  .qty-input:focus { outline:none; border-color:#0ea5e9; box-shadow:0 0 0 3px rgba(14,165,233,.2); }
+
+  /* 갑/보루 컬럼 강조 — 양쪽에 굵은 세로선 */
+  .col-pack { border-left: 3px solid #f59e0b; border-right: 3px solid #f59e0b; background: #fffbeb; }
+  .col-carton { border-left: 3px solid #0ea5e9; border-right: 3px solid #0ea5e9; background: #f0f9ff; }
+  thead .col-pack, thead .col-carton { background-color: inherit; }
+  thead .col-pack { background:#fef3c7 !important; color:#78350f; }
+  thead .col-carton { background:#e0f2fe !important; color:#075985; }
+
+  /* 미니 스파크라인 */
+  .spark { display:inline-flex; align-items:flex-end; gap:2px; height:24px; }
+  .spark > span { width:6px; background:#94a3b8; border-radius:1px; min-height:2px; }
+  .spark > span.today { background:#0ea5e9; }
+
+  @media print {
+    header, nav, .tab-btn, #toast, button, .mode-btn, [data-panel]:not([data-panel="stock"]) { display:none !important; }
+    body { background:#fff; }
+    main { padding:0; max-width:100%; }
+    .print-only { display:block !important; }
+    .no-print { display:none !important; }
+    table { page-break-inside:auto; }
+    tr { page-break-inside:avoid; page-break-after:auto; }
+  }
+  .print-only { display:none; }
+</style>
+</head>
+<body class="font-sans text-slate-900">
+
+<!-- ===== Header ===== -->
+<header class="sticky top-0 z-30 bg-ink-900 text-white border-b border-ink-700">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
+    <div class="w-9 h-9 rounded-xl bg-accent-500/20 grid place-items-center">
+      <span class="text-accent-400 font-extrabold">담</span>
+    </div>
+    <div class="flex-1 min-w-0">
+      <div class="font-bold leading-tight">담배2026 재고관리</div>
+      <div class="text-xs text-slate-400" id="header-sub">Google Sheets 연동</div>
+    </div>
+    <button id="btn-settings" class="w-8 h-8 grid place-items-center rounded-lg bg-ink-700 hover:bg-ink-800 active:scale-95 transition" title="설정/연결 상태">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+    <button id="btn-refresh" class="text-xs px-2.5 py-1.5 rounded-lg bg-ink-700 hover:bg-ink-800 active:scale-95 transition" title="새로고침">↻ 새로고침</button>
+    <div id="health-dot" class="w-2.5 h-2.5 rounded-full bg-slate-500" title="연결 상태"></div>
+  </div>
+
+  <!-- Tabs (4개로 정리) -->
+  <nav class="max-w-6xl mx-auto px-2 pb-2 flex gap-1 overflow-x-auto scroll-x">
+    <button data-tab="dash" class="tab-btn shrink-0 text-sm px-3 py-2 rounded-lg bg-ink-800 hover:bg-ink-700" aria-selected="true">대시보드</button>
+    <button data-tab="stock" class="tab-btn shrink-0 text-sm px-3 py-2 rounded-lg bg-ink-800 hover:bg-ink-700">재고조회</button>
+    <button data-tab="inout" class="tab-btn shrink-0 text-sm px-3 py-2 rounded-lg bg-ink-800 hover:bg-ink-700">입출고</button>
+  </nav>
+</header>
+
+<!-- Toast -->
+<div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 hidden">
+  <div id="toast-msg" class="px-4 py-2.5 rounded-xl shadow-xl bg-slate-900 text-white text-sm"></div>
+</div>
+
+<main class="max-w-6xl mx-auto px-4 py-5 pb-32">
+
+<!-- ============ 대시보드 (전면 개편) ============ -->
+<section data-panel="dash" class="space-y-4">
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+    <div class="flex flex-wrap items-end gap-3">
+      <div>
+        <label class="text-xs text-slate-500">월 선택</label>
+        <input id="dash-month" type="month" class="mt-1 px-3 py-2 rounded-xl border border-slate-300" />
+      </div>
+      <div class="flex-1 min-w-[180px]">
+        <label class="text-xs text-slate-500">상품 검색</label>
+        <input id="dash-q" type="search" placeholder="상품명/제조사" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300" />
+      </div>
+      <div>
+        <label class="text-xs text-slate-500">제조사</label>
+        <select id="dash-maker" class="mt-1 px-3 py-2 rounded-xl border border-slate-300"><option value="">전체</option></select>
+      </div>
+      <label class="text-sm flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
+        <input id="dash-active" type="checkbox" class="accent-emerald-500" checked /> 판매중만
+      </label>
+    </div>
+    <div class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+      <div class="bg-slate-50 rounded-xl p-3">
+        <div class="text-xs text-slate-500">선택한 달 매출</div>
+        <div id="dash-kpi-month" class="text-xl font-bold mt-1">₩0</div>
+      </div>
+      <div class="bg-slate-50 rounded-xl p-3">
+        <div class="text-xs text-slate-500">최근 7일 매출</div>
+        <div id="dash-kpi-week" class="text-xl font-bold mt-1">₩0</div>
+      </div>
+      <div class="bg-slate-50 rounded-xl p-3">
+        <div class="text-xs text-slate-500">오늘 매출</div>
+        <div id="dash-kpi-today" class="text-xl font-bold mt-1">₩0</div>
+      </div>
+      <div class="bg-slate-50 rounded-xl p-3">
+        <div class="text-xs text-slate-500">재고 부족 품목</div>
+        <div id="dash-kpi-low" class="text-xl font-bold mt-1 text-amber-700">0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 메인 표: 상품별 7일 일별판매 + 월합 + 현재고 -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+      <h3 class="font-semibold">상품별 판매 현황</h3>
+      <span class="text-xs text-slate-500">최근 7일 일별 + 선택한 달 합계 + 현재고</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="text-slate-600 bg-slate-100 border-b-2 border-slate-300 sticky top-0">
+          <tr>
+            <th class="text-left px-3 py-3">상품</th>
+            <th class="text-left px-3 py-3">제조사</th>
+            <th class="px-3 py-3 text-center">최근 7일 판매(갑환산)</th>
+            <th class="px-3 py-3 text-center">7일 합계</th>
+            <th class="px-3 py-3 text-center">월 판매(갑환산)</th>
+            <th class="px-3 py-3 text-center col-pack">갑</th>
+            <th class="px-3 py-3 text-center col-carton">보루</th>
+          </tr>
+        </thead>
+        <tbody id="dash-body"><tr><td colspan="7" class="text-center py-12 text-slate-400">불러오는 중…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 재고조회 ============ -->
+<section data-panel="stock" class="space-y-4 hidden">
+
+  <!-- 모드 스위치 -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-1.5 inline-flex gap-1">
+    <button data-mode="list" class="mode-btn px-4 py-2 rounded-xl text-sm font-medium" aria-selected="true">📖 목록</button>
+    <button data-mode="order" class="mode-btn px-4 py-2 rounded-xl text-sm font-medium" aria-selected="false">🛒 발주</button>
+    <button data-mode="audit" class="mode-btn px-4 py-2 rounded-xl text-sm font-medium" aria-selected="false">📋 재고조사</button>
+  </div>
+
+  <!-- 공통 필터 -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+    <div class="flex flex-wrap gap-2 items-end">
+      <div class="flex-1 min-w-[180px]">
+        <label class="text-xs text-slate-500">검색</label>
+        <input id="stock-q" type="search" placeholder="상품명/제조사/바코드" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300" />
+      </div>
+      <div>
+        <label class="text-xs text-slate-500">제조사</label>
+        <select id="stock-maker" class="mt-1 px-3 py-2 rounded-xl border border-slate-300"><option value="">전체</option></select>
+      </div>
+      <label class="text-sm flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer" data-show-mode="list">
+        <input id="stock-low" type="checkbox" class="accent-amber-500" /> 부족만
+      </label>
+      <label class="text-sm flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
+        <input id="stock-active" type="checkbox" class="accent-emerald-500" checked /> 판매중만
+      </label>
+      <div data-show-mode="order" class="hidden">
+        <label class="text-xs text-slate-500">목표 안전재고(보루)+α</label>
+        <input id="order-buffer" type="number" min="0" value="1" class="mt-1 w-24 px-3 py-2 rounded-xl border border-slate-300" />
+      </div>
+    </div>
+    <div class="mt-3 flex flex-wrap gap-3 text-sm text-slate-600" id="stock-summary"></div>
+  </div>
+
+  <!-- 모드 1: 목록 — 안전/단가 컬럼 제거, 갑/보루 강조선 -->
+  <div data-show-mode="list" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="text-slate-600 bg-slate-100 border-b-2 border-slate-300 sticky top-0">
+          <tr>
+            <th class="text-left px-3 py-3">상품</th>
+            <th class="px-3 py-3 text-left">제조사</th>
+            <th class="px-3 py-3 text-center col-pack">갑</th>
+            <th class="px-3 py-3 text-center col-carton">보루</th>
+            <th class="px-3 py-3 text-center">상태</th>
+            <th class="px-3 py-3 text-center w-12"><span class="sr-only">편집</span></th>
+          </tr>
+        </thead>
+        <tbody id="stock-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 모드 2: 발주 -->
+  <div data-show-mode="order" class="hidden space-y-3">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-wrap items-center gap-3">
+      <div class="text-sm text-slate-600">
+        부족 상품 <b id="order-count" class="text-amber-700">0</b>건 &middot;
+        권장 발주 총 <b id="order-recommend" class="text-sky-700">0</b>보루 &middot;
+        입력 총 <b id="order-input-total" class="text-emerald-700">0</b>보루
+      </div>
+      <div class="flex-1"></div>
+      <button id="order-fill-recommend" class="text-xs px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200">권장량으로 일괄채움</button>
+      <button id="order-clear" class="text-xs px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200">다 지우기</button>
+      <button id="order-export" class="text-sm px-3 py-2 rounded-lg bg-ink-900 text-white hover:bg-ink-800">발주서 CSV</button>
+      <button id="order-print" class="text-sm px-3 py-2 rounded-lg bg-accent-500 text-white hover:bg-accent-600">인쇄</button>
+    </div>
+    <div id="order-groups" class="space-y-3"></div>
+  </div>
+
+  <!-- 모드 3: 재고조사 -->
+  <div data-show-mode="audit" class="hidden space-y-3">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+      <div class="flex flex-wrap items-center gap-3 text-sm">
+        <div class="text-slate-600">
+          확정 <b id="audit-entered" class="text-slate-900">0</b>/<span id="audit-total">0</span>건 &middot;
+          차이 있음 <b id="audit-diff" class="text-rose-700">0</b>건 &middot;
+          총 차이(갑환산) <b id="audit-diff-units" class="text-rose-700">0</b>개
+        </div>
+        <div class="flex-1"></div>
+        <label class="text-sm flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 cursor-pointer">
+          <input id="audit-only-diff" type="checkbox" class="accent-rose-500" /> 차이만 보기
+        </label>
+        <label class="text-sm flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 cursor-pointer">
+          <input id="audit-only-confirmed" type="checkbox" class="accent-emerald-500" /> 확정만 보기
+        </label>
+        <button id="audit-clear" class="text-xs px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200" title="입력값과 확정 모두 지웁니다">전체 지우기</button>
+        <button id="audit-apply" class="text-sm px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">확정한 차이만 일괄 저장</button>
+      </div>
+      <div class="text-xs text-slate-500 mt-2">실재고를 입력한 뒤 <b>확정</b> 체크박스를 켜야 저장 대상이 됩니다.</div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="text-slate-600 bg-slate-100 border-b-2 border-slate-300 sticky top-0">
+            <tr>
+              <th class="text-left px-3 py-3">상품</th>
+              <th class="px-3 py-3 text-left">제조사</th>
+              <th class="px-3 py-3 text-center bg-sky-50">시스템<br/><span class="text-xs text-slate-500">갑 / 보루</span></th>
+              <th class="px-3 py-3 text-center bg-emerald-50">실재고<br/><span class="text-xs text-slate-500">갑 / 보루</span></th>
+              <th class="px-3 py-3 text-center">확정</th>
+              <th class="px-3 py-3 text-center bg-rose-50">차이(갑)</th>
+            </tr>
+          </thead>
+          <tbody id="audit-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 입출고 (4개 하위탭) ============ -->
+<section data-panel="inout" class="space-y-4 hidden">
+  <!-- 하위탭 -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-1.5 inline-flex gap-1 flex-wrap">
+    <button data-subtab="sale" class="subtab-btn px-4 py-2 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100" aria-selected="true">🧾 판매 입력</button>
+    <button data-subtab="io" class="subtab-btn px-4 py-2 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100" aria-selected="false">📥 입출고</button>
+    <button data-subtab="csv" class="subtab-btn px-4 py-2 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100" aria-selected="false">📤 CSV 업로드</button>
+    <button data-subtab="newp" class="subtab-btn px-4 py-2 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100" aria-selected="false">➕ 신규 담배</button>
+    <button data-subtab="log" class="subtab-btn px-4 py-2 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100" aria-selected="false">📜 최근 기록</button>
+  </div>
+
+  <!-- 하위탭 1: 판매 입력 -->
+  <div data-subpanel="sale" class="space-y-4">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-semibold text-slate-800">판매 입력</h2>
+        <button id="btn-scan" class="text-sm px-3 py-1.5 rounded-lg bg-accent-500 text-white hover:bg-accent-600 active:scale-95">📷 바코드 스캔</button>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
+        <div class="sm:col-span-7">
+          <label class="text-xs text-slate-500">바코드 / 상품명 검색</label>
+          <input id="sale-search" type="search" autocomplete="off" placeholder="바코드 스캔 또는 상품명" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-300" />
+          <div id="sale-suggest" class="mt-1 hidden bg-white border border-slate-200 rounded-xl shadow-lg max-h-72 overflow-auto"></div>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="text-xs text-slate-500">단위</label>
+          <select id="sale-unit" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-300">
+            <option value="단일">갑</option>
+            <option value="보루">보루</option>
+          </select>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="text-xs text-slate-500">수량</label>
+          <input id="sale-qty" type="number" min="1" value="1" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-300" />
+        </div>
+        <div class="sm:col-span-1 flex items-end">
+          <button id="sale-add" class="w-full px-3 py-2.5 rounded-xl bg-ink-900 text-white hover:bg-ink-800">담기</button>
+        </div>
+      </div>
+      <div id="sale-selected" class="mt-2 text-sm text-slate-600 hidden"></div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200">
+      <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+        <h3 class="font-semibold">판매 카트 <span id="cart-count" class="text-slate-400 font-normal">(0)</span></h3>
+        <div class="flex gap-2">
+          <button id="cart-clear" class="text-xs px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200">비우기</button>
+          <button id="cart-submit" class="text-sm px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">저장하기</button>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm zebra">
+          <thead class="text-slate-500 bg-slate-50">
+            <tr><th class="text-left px-3 py-2">상품</th><th class="px-3 py-2">단위</th><th class="px-3 py-2">수량</th><th class="px-3 py-2">단가</th><th class="px-3 py-2">금액</th><th class="px-3 py-2"></th></tr>
+          </thead>
+          <tbody id="cart-body"><tr><td colspan="6" class="text-center py-8 text-slate-400">담긴 상품이 없습니다</td></tr></tbody>
+          <tfoot class="font-semibold">
+            <tr class="border-t border-slate-200"><td colspan="4" class="text-right px-3 py-2 text-slate-600">합계</td><td class="px-3 py-2 text-right" id="cart-total">₩0</td><td></td></tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 하위탭 2: 입출고 -->
+  <div data-subpanel="io" class="space-y-4 hidden">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+      <h2 class="font-semibold mb-3">입출고 등록</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
+        <div class="sm:col-span-5">
+          <label class="text-xs text-slate-500">상품 검색</label>
+          <input id="io-search" type="search" autocomplete="off" placeholder="바코드/상품명" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-300" />
+          <div id="io-suggest" class="mt-1 hidden bg-white border border-slate-200 rounded-xl shadow-lg max-h-72 overflow-auto"></div>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="text-xs text-slate-500">구분</label>
+          <select id="io-type" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-300">
+            <option>입고</option><option>반품</option><option>출고조정</option><option>재고조정</option>
+          </select>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="text-xs text-slate-500">단위</label>
+          <select id="io-unit" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-300"><option value="단일">갑</option><option value="보루" selected>보루</option></select>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="text-xs text-slate-500">수량</label>
+          <input id="io-qty" type="number" min="1" value="1" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-300" />
+        </div>
+        <div class="sm:col-span-1 flex items-end">
+          <button id="io-add" class="w-full px-3 py-2.5 rounded-xl bg-ink-900 text-white hover:bg-ink-800">담기</button>
+        </div>
+        <div class="sm:col-span-12">
+          <label class="text-xs text-slate-500">메모(선택)</label>
+          <input id="io-memo" type="text" placeholder="공급처, 사유 등" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300" />
+        </div>
+      </div>
+      <div id="io-selected" class="mt-2 text-sm text-slate-600 hidden"></div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200">
+      <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+        <h3 class="font-semibold">입출고 카트 <span id="iocart-count" class="text-slate-400 font-normal">(0)</span></h3>
+        <div class="flex gap-2">
+          <button id="iocart-clear" class="text-xs px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200">비우기</button>
+          <button id="iocart-submit" class="text-sm px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">저장하기</button>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm zebra">
+          <thead class="text-slate-500 bg-slate-50"><tr><th class="text-left px-3 py-2">상품</th><th class="px-3 py-2">구분</th><th class="px-3 py-2">단위</th><th class="px-3 py-2">수량</th><th class="px-3 py-2"></th></tr></thead>
+          <tbody id="iocart-body"><tr><td colspan="5" class="text-center py-8 text-slate-400">담긴 항목이 없습니다</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 하위탭 3: CSV 업로드 -->
+  <div data-subpanel="csv" class="space-y-4 hidden">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+      <h2 class="font-semibold mb-2">CSV 일괄 업로드 (판매)</h2>
+      <p class="text-sm text-slate-500 mb-3">헤더 예시: <code class="bg-slate-100 px-1 rounded">일시,바코드,단위,수량,메모</code> — 단위(갑/보루)·메모는 선택. 일시 없으면 현재 시각으로 기록.</p>
+      <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
+        <div class="sm:col-span-7">
+          <input id="csv-file" type="file" accept=".csv,text/csv" class="block w-full text-sm" />
+          <textarea id="csv-text" rows="8" placeholder="또는 여기에 직접 붙여넣기" class="mt-2 w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs"></textarea>
+        </div>
+        <div class="sm:col-span-5 space-y-2">
+          <button id="csv-preview" class="w-full px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-sm">미리보기</button>
+          <button id="csv-upload" class="w-full px-3 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 text-sm">업로드 실행</button>
+          <a id="csv-template" download="판매업로드_양식.csv" class="block text-center text-xs text-accent-600 underline">양식 CSV 다운로드</a>
+        </div>
+      </div>
+      <div id="csv-result" class="mt-3 text-sm"></div>
+    </div>
+  </div>
+
+  <!-- 하위탭 4: 신규 담배 -->
+  <div data-subpanel="newp" class="space-y-4 hidden">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+      <h2 class="font-semibold mb-3">신규 담배 추가</h2>
+      <p class="text-xs text-slate-500 mb-3">새 담배를 등록하면 Google Sheets <b>앱_상품마스터</b>에 자동 추가됩니다. 상품ID는 비워두면 자동 생성(P###)됩니다.</p>
+      <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
+        <div class="sm:col-span-2">
+          <label class="text-xs text-slate-500">상품ID</label>
+          <input id="new-id" type="text" placeholder="자동" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300 font-mono" />
+        </div>
+        <div class="sm:col-span-5">
+          <label class="text-xs text-slate-500">상품명 <span class="text-rose-500">*</span></label>
+          <input id="new-name" type="text" placeholder="예: 더원블루[1]" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300" />
+        </div>
+        <div class="sm:col-span-2">
+          <label class="text-xs text-slate-500">제조사</label>
+          <input id="new-maker" type="text" placeholder="ktng / pmk / bat / jti" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300" list="maker-list" />
+          <datalist id="maker-list"></datalist>
+        </div>
+        <div class="sm:col-span-3">
+          <label class="text-xs text-slate-500">안전재고(보루)</label>
+          <input id="new-safety" type="number" min="0" value="1" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300" />
+        </div>
+        <div class="sm:col-span-3">
+          <label class="text-xs text-slate-500">바코드(갑)</label>
+          <input id="new-barcode-single" type="text" placeholder="갑 바코드" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300 font-mono" />
+        </div>
+        <div class="sm:col-span-3">
+          <label class="text-xs text-slate-500">바코드(보루)</label>
+          <input id="new-barcode-carton" type="text" placeholder="보루 바코드" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300 font-mono" />
+        </div>
+        <div class="sm:col-span-3">
+          <label class="text-xs text-slate-500">단가(갑) ₩</label>
+          <input id="new-price-single" type="number" min="0" placeholder="4500" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300" />
+        </div>
+        <div class="sm:col-span-3">
+          <label class="text-xs text-slate-500">단가(보루) ₩</label>
+          <input id="new-price-carton" type="number" min="0" placeholder="45000" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300" />
+        </div>
+        <div class="sm:col-span-3">
+          <label class="text-xs text-slate-500">초기재고(갑)</label>
+          <input id="new-init-single" type="number" min="0" value="0" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300" />
+        </div>
+        <div class="sm:col-span-3">
+          <label class="text-xs text-slate-500">초기재고(보루)</label>
+          <input id="new-init-carton" type="number" min="0" value="0" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300" />
+        </div>
+        <div class="sm:col-span-9">
+          <label class="text-xs text-slate-500">메모</label>
+          <input id="new-note" type="text" placeholder="비고(선택)" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300" />
+        </div>
+        <div class="sm:col-span-3 flex items-end">
+          <button id="new-submit" class="w-full px-3 py-2.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 font-semibold">신규 담배 등록</button>
+        </div>
+      </div>
+      <div id="new-result" class="mt-3 text-sm"></div>
+    </div>
+  </div>
+
+  <!-- 하위탭 5: 최근 기록 (로그) -->
+  <div data-subpanel="log" class="space-y-4 hidden">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+      <div class="flex flex-wrap items-end gap-3">
+        <div>
+          <label class="text-xs text-slate-500">종류</label>
+          <select id="log-kind" class="mt-1 px-3 py-2 rounded-xl border border-slate-300">
+            <option value="all">전체</option>
+            <option value="sale">판매</option>
+            <option value="io">입출고</option>
+          </select>
+        </div>
+        <div class="flex-1 min-w-[180px]">
+          <label class="text-xs text-slate-500">상품 검색</label>
+          <input id="log-q" type="search" placeholder="상품명/바코드" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300" />
+        </div>
+        <button id="log-refresh" class="text-sm px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200">↻ 다시 불러오기</button>
+      </div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200">
+      <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+        <h3 class="font-semibold">최근 기록 <span id="log-count" class="text-slate-400 font-normal">(0)</span></h3>
+        <span class="text-xs text-slate-500">최근 50건</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm zebra">
+          <thead class="text-slate-500 bg-slate-50">
+            <tr>
+              <th class="text-left px-3 py-2">일시</th>
+              <th class="text-left px-3 py-2">종류</th>
+              <th class="text-left px-3 py-2">상품</th>
+              <th class="px-3 py-2">단위</th>
+              <th class="px-3 py-2">수량</th>
+              <th class="px-3 py-2 text-right">금액/메모</th>
+              <th class="px-3 py-2 w-20"></th>
+            </tr>
+          </thead>
+          <tbody id="log-body"><tr><td colspan="7" class="text-center py-8 text-slate-400">없음</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ===== Scanner Modal ===== -->
+<div id="scanner-modal" class="fixed inset-0 z-40 bg-black/70 hidden items-center justify-center p-4">
+  <div class="bg-white rounded-2xl w-full max-w-md overflow-hidden">
+    <div class="flex items-center justify-between px-4 py-3 border-b">
+      <h3 class="font-semibold">바코드 스캔</h3>
+      <button id="scanner-close" class="text-slate-500 hover:text-slate-900">✕</button>
+    </div>
+    <div class="relative bg-black aspect-[4/3]">
+      <video id="scanner-video" class="w-full h-full object-cover" muted playsinline></video>
+      <div class="absolute inset-x-8 top-1/2 h-0.5 bg-red-500/80 ring-pulse rounded-full"></div>
+    </div>
+    <div class="px-4 py-3 text-xs text-slate-500">카메라 권한이 필요합니다.</div>
+  </div>
+</div>
+
+<!-- ===== 상품 편집 모달 ===== -->
+<div id="edit-modal" class="fixed inset-0 z-40 bg-black/60 hidden items-center justify-center p-4">
+  <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div class="flex items-center justify-between px-4 py-3 border-b">
+      <h3 class="font-semibold" id="edit-modal-title">상품 편집</h3>
+      <button id="edit-close" class="text-slate-500 hover:text-slate-900 text-xl leading-none">✕</button>
+    </div>
+    <div id="edit-list-view" class="flex-1 overflow-hidden flex flex-col">
+      <div class="px-4 py-3 border-b border-slate-100">
+        <input id="edit-search" type="search" placeholder="상품명 / 제조사 / 바코드로 검색" class="w-full px-3 py-2.5 rounded-xl border border-slate-300" />
+      </div>
+      <div id="edit-list" class="overflow-auto flex-1 divide-y divide-slate-100"></div>
+    </div>
+    <div id="edit-form-view" class="hidden flex-1 overflow-auto">
+      <div class="p-4 space-y-3">
+        <button id="edit-back" class="text-xs text-slate-500 hover:text-slate-900 inline-flex items-center gap-1">← 목록으로</button>
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
+          <div class="sm:col-span-3">
+            <label class="text-xs text-slate-500">상품ID</label>
+            <input id="edit-id" type="text" disabled class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-mono text-slate-500" />
+          </div>
+          <div class="sm:col-span-9">
+            <label class="text-xs text-slate-500">상품명 <span class="text-rose-500">*</span></label>
+            <input id="edit-name" type="text" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+          <div class="sm:col-span-6">
+            <label class="text-xs text-slate-500">제조사</label>
+            <input id="edit-maker" type="text" list="maker-list" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+          <div class="sm:col-span-3">
+            <label class="text-xs text-slate-500">안전재고(보루)</label>
+            <input id="edit-safety" type="number" min="0" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+          <div class="sm:col-span-3 flex items-end">
+            <label class="text-sm flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer w-full justify-center">
+              <input id="edit-discontinued" type="checkbox" class="accent-rose-500" /> 단종(판매중지)
+            </label>
+          </div>
+          <div class="sm:col-span-6">
+            <label class="text-xs text-slate-500">바코드(갑)</label>
+            <input id="edit-bc-single" type="text" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300 font-mono" />
+          </div>
+          <div class="sm:col-span-6">
+            <label class="text-xs text-slate-500">바코드(보루)</label>
+            <input id="edit-bc-carton" type="text" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300 font-mono" />
+          </div>
+          <div class="sm:col-span-6">
+            <label class="text-xs text-slate-500">단가(갑) ₩</label>
+            <input id="edit-price-single" type="number" min="0" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+          <div class="sm:col-span-6">
+            <label class="text-xs text-slate-500">단가(보루) ₩</label>
+            <input id="edit-price-carton" type="number" min="0" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+          <div class="sm:col-span-12">
+            <label class="text-xs text-slate-500">메모</label>
+            <input id="edit-note" type="text" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+        </div>
+        <div id="edit-result" class="text-sm"></div>
+      </div>
+    </div>
+    <div id="edit-form-actions" class="hidden px-4 py-3 border-t border-slate-100 flex items-center justify-end gap-2">
+      <button id="edit-cancel" class="text-sm px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200">취소</button>
+      <button id="edit-save" class="text-sm px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-semibold">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 설정/안내 모달 ===== -->
+<div id="settings-modal" class="fixed inset-0 z-40 bg-black/60 hidden items-center justify-center p-4">
+  <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+    <div class="flex items-center justify-between px-4 py-3 border-b">
+      <h3 class="font-semibold">설정 / 사용 안내</h3>
+      <button id="settings-close" class="text-slate-500 hover:text-slate-900 text-xl leading-none">✕</button>
+    </div>
+    <div class="overflow-auto p-4 space-y-4 text-sm">
+      <div>
+        <h4 class="font-semibold mb-2">서버 / 연결 상태</h4>
+        <div id="settings-health" class="font-mono bg-slate-900 text-slate-100 rounded-xl p-3 overflow-auto text-xs">불러오는 중…</div>
+        <div class="text-xs text-slate-500 mt-2">스프레드시트:
+          <a class="text-accent-600 underline" target="_blank" id="ss-link" href="#">담배2026 시트 열기</a>
+        </div>
+      </div>
+      <div>
+        <h4 class="font-semibold mb-2">사용 안내</h4>
+        <ol class="list-decimal pl-5 space-y-1 text-slate-600">
+          <li>판매 발생 시 <b>입출고 → 판매 입력</b>에서 바코드 스캔 후 담기/저장.</li>
+          <li>박스 입고는 <b>입출고 → 입출고</b>에서 입고로 등록.</li>
+          <li>POS CSV는 <b>입출고 → CSV 업로드</b>에서 일괄 반영.</li>
+          <li>새 담배는 <b>입출고 → 신규 담배</b> 탭에서 등록.</li>
+          <li>판매·입출고 내역 확인/취소는 <b>입출고 → 최근 기록</b>.</li>
+          <li><b>재고조회 → 목록</b>에서 갑(노란줄) / 보루(파란줄) 칸이 강조됩니다. 행 끝 ✏️ 버튼으로 단가·안전재고·메모 등을 수정할 수 있어요.</li>
+          <li>판매로 갑이 0 이하가 되면 자동으로 보루 1개를 풀어 갑 +10으로 환산합니다.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/app.js?v=7"></script>
+</body>
+</html>

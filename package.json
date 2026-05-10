@@ -1,0 +1,15 @@
+{
+  "name": "tobacco2026",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "dev": "node server/index.js",
+    "start": "NODE_ENV=production node server/index.js",
+    "build": "echo 'static build only — public/ already complete'"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "googleapis": "^144.0.0"
+  }
+}
