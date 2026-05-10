@@ -252,6 +252,8 @@ $('#cart-submit').addEventListener('click', async () => {
     state.cart = []; renderCart();
     state.sales = []; state.inout = [];  // 캐시 무효화
     await loadStock(true);
+    // 등록 즉시 로그 재조회 (현재 탭 여부와 무관하게 최신화)
+    await loadLog();
   } catch (e) { toast('저장 실패: ' + e.message, 'err'); }
 });
 
@@ -707,6 +709,7 @@ $('#iocart-submit').addEventListener('click', async () => {
     state.ioCart = []; renderIOCart();
     state.sales = []; state.inout = [];
     await loadStock(true);
+    await loadLog();
   } catch (e) { toast('저장 실패: '+e.message, 'err'); }
 });
 
@@ -766,13 +769,19 @@ function renderLog() {
       <td class="px-3 py-2 text-center">${cancelBtn}</td>
     </tr>`;
   }).join('');
-  // 취소 버튼 핸들러
+  // 취소 버튼 핸들러 (중복 클릭 방지)
   $$('button[data-cancel-i]', tb).forEach(b => {
     b.addEventListener('click', async () => {
+      if (b.disabled) return;
       const idx = +b.dataset.cancelI;
       const r = rows[idx];
       if (!r) return;
       if (!confirm(`이 ${r.kind==='sale'?'판매':'입출고'} 기록을 취소하시겠습니까?\n\n${r.name} · ${unitLabel(r.unit)} ${r.qty}개\n\n※ 원본은 보존되고, 반대 기록이 추가됩니다.`)) return;
+      // 즉시 비활성화 — 응답 오기 전 추가 클릭 차단
+      b.disabled = true;
+      b.textContent = '처리중…';
+      b.classList.remove('hover:bg-rose-100');
+      b.classList.add('opacity-50', 'cursor-not-allowed');
       try {
         await api('/api/cancel', { method: 'POST', body: {
           kind: r.kind, productId: r.productId, datetime: r.datetime,
@@ -781,7 +790,14 @@ function renderLog() {
         toast('취소 처리됨');
         state.sales = []; state.inout = [];
         await loadStock(true); await loadLog();
-      } catch (e) { toast('취소 실패: '+e.message, 'err'); }
+      } catch (e) {
+        toast('취소 실패: '+e.message, 'err');
+        // 실패 시 다시 활성화
+        b.disabled = false;
+        b.textContent = '✕ 취소';
+        b.classList.add('hover:bg-rose-100');
+        b.classList.remove('opacity-50', 'cursor-not-allowed');
+      }
     });
   });
 }
