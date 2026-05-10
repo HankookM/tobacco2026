@@ -156,14 +156,23 @@ webapp/
 
 ### 3) 환경 변수 설정
 
-Pages 프로젝트 생성 후 **Settings → Environment variables → Production**에서:
+프로젝트 생성 후 대시보드에서:
 
-| Variable name | Value | Type |
+1. 좌측 **Workers & Pages** → 방금 만든 `tobacco2026` 프로젝트 클릭
+2. 상단 **Settings** 탭
+3. **Variables and Secrets** 섹션 스크롤 → **Add** 버튼
+4. 아래 두 개를 차례로 추가:
+
+| Type | Variable name | Value |
 | --- | --- | --- |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | 서비스 계정 JSON 파일 전체 내용 (한 줄로) | **Encrypt** 체크 |
-| `SPREADSHEET_ID` | `1Bfzg3V3GwprCaBUtZuHREWwdxnwR72nAxBBjQ_ZjrFw` | Plaintext |
+| **Secret** | `GOOGLE_SERVICE_ACCOUNT_JSON` | 서비스 계정 JSON 파일 전체 내용 (한 줄) |
+| **Plaintext** | `SPREADSHEET_ID` | `1Bfzg3V3GwprCaBUtZuHREWwdxnwR72nAxBBjQ_ZjrFw` |
 
-저장 후 **Save and deploy** 클릭.
+⚠️ Type 선택 시 `GOOGLE_SERVICE_ACCOUNT_JSON`은 반드시 **Secret** 로 설정 (암호화 저장).
+
+5. **Deploy** 클릭 → 변경사항이 적용되면서 자동 재배포
+
+> 참고: Cloudflare가 2025년 중반 UI 개편으로 구버전의 *Environment variables → Production* 메뉴가 없어지고 **Variables and Secrets**로 통합되었습니다. 이제 추가 시 Type을 Plaintext/Secret로 선택하면 됩니다.
 
 ### 4) 배포 확인
 
