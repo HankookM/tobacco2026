@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: tobacco2026
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm ci --omit=dev
+    startCommand: node server/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: SPREADSHEET_ID
+        value: 1Bfzg3V3GwprCaBUtZuHREWwdxnwR72nAxBBjQ_ZjrFw
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false

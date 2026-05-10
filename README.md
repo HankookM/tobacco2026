@@ -123,7 +123,45 @@ webapp/
 │  ├─ index.html          # SPA UI
 │  ├─ app.js              # 프론트엔드 로직
 │  └─ manifest.webmanifest
-├─ credentials.json       # (선택) 서비스 계정 키 — gitignore에 등록
+├─ secrets/credentials.json  # (선택) 서비스 계정 키 — gitignore에 등록
+├─ render.yaml            # Render.com 배포 설정
 ├─ package.json
 └─ README.md
 ```
+
+---
+
+## 7. Render.com 배포 (권장 호스팅)
+
+### 1) 저장소 연결
+
+1. [Render.com](https://render.com) 가입 → **New → Web Service**
+2. **GitHub 저장소 연결** → `HankookM/tobacco2026` 선택
+3. Render가 `render.yaml`을 자동 감지 → **Apply** 클릭
+
+### 2) 환경 변수 설정 (1회)
+
+Render 대시보드 → 서비스 → **Environment** 탭에서 추가:
+
+| Key | Value |
+| --- | --- |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | `secrets/credentials.json` 파일 **전체 내용**을 복붙 (한 줄로) |
+
+`SPREADSHEET_ID`, `NODE_ENV`, `PORT`는 `render.yaml`에 이미 설정되어 있어 자동 적용됩니다.
+
+### 3) 배포
+
+- 첫 배포는 **Manual Deploy → Deploy latest commit** 클릭
+- 이후부터는 GitHub `main`에 푸시하면 자동 배포
+- 배포 URL: `https://tobacco2026.onrender.com` (또는 Render가 부여한 서브도메인)
+
+### 4) 동작 확인
+
+- `https://<your-url>/api/health` → `{"ok":true,"auth":"service-account"}`
+- 루트 URL 접속 시 앱 화면 표시
+
+### 무료 플랜 주의사항
+
+- 15분간 트래픽 없으면 슬립 → 첫 요청 시 30~60초 콜드 스타트
+- 월 750시간 무료 (단일 서비스 24/7 실행에 충분)
+- 가게에서 항상 켜두려면 [Better Stack](https://betterstack.com/) 같은 무료 핑 서비스로 5분마다 깨우거나 유료 플랜($7/월)으로 전환
