@@ -409,15 +409,60 @@ async function handleCancel(env, body) {
     const ts = kstNow();
     const unit = b.unit === '보루' ? '보루' : '단일';
     const qty = parseInt(b.qty) || 0;
-    const ref = b.datetime ? `[취소] 원본 ${b.datetime}` : '[취소]';
+    const origDatetime = b.datetime || '';
+    const ref = origDatetime ? `[취소] 원본 ${origDatetime}` : '[취소]';
+
     if (kind === 'sale') {
+      // 1) 원본 행 찾아서 메모(H열)에 [취소됨] 마킹 — 두번 누르기 방지
+      const sheetRange = `${SHEET_SALES}!A2:I10000`;
+      const cur = await valuesGet(env, sid, sheetRange);
+      const rows = cur.values || [];
+      let foundIdx = -1;
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        if (r[0] === origDatetime && r[1] === productId &&
+            r[3] === unit && (parseInt(r[4]) || 0) === qty &&
+            !(r[7] || '').includes('[취소됨]')) {
+          foundIdx = i; break;
+        }
+      }
+      if (foundIdx >= 0) {
+        const r = rows[foundIdx];
+        const newMemo = '[취소됨] ' + (r[7] || '');
+        const targetRow = foundIdx + 2; // A2 시작이라 +2
+        await valuesUpdate(env, sid, `${SHEET_SALES}!H${targetRow}`, [[newMemo]]);
+      }
+      // 2) 반대 행 추가 (재고/매출 환원용)
       const unitPrice = unit === '보루' ? m.priceCarton : m.priceSingle;
       const row = [ts, m.id, m.name, unit, -qty, unitPrice, -unitPrice * qty, ref, 'cancel'];
       await valuesAppend(env, sid, `${SHEET_SALES}!A:I`, [row]);
+
     } else if (kind === 'io') {
+      // 1) 원본 행 마킹 (입출고는 G열이 메모)
+      const sheetRange = `${SHEET_INOUT}!A2:G10000`;
+      const cur = await valuesGet(env, sid, sheetRange);
+      const rows = cur.values || [];
+      const origType = b.type || '';
+      let foundIdx = -1;
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        if (r[0] === origDatetime && r[1] === productId &&
+            r[3] === origType && r[4] === unit && (parseInt(r[5]) || 0) === qty &&
+            !(r[6] || '').includes('[취소됨]')) {
+          foundIdx = i; break;
+        }
+      }
+      if (foundIdx >= 0) {
+        const r = rows[foundIdx];
+        const newMemo = '[취소됨] ' + (r[6] || '');
+        const targetRow = foundIdx + 2;
+        await valuesUpdate(env, sid, `${SHEET_INOUT}!G${targetRow}`, [[newMemo]]);
+      }
+      // 2) 반대 행 추가
       const type = b.type || '입고';
       const row = [ts, m.id, m.name, type, unit, -qty, ref + (b.memo ? (' · ' + b.memo) : '')];
       await valuesAppend(env, sid, `${SHEET_INOUT}!A:G`, [row]);
+
     } else {
       return err('kind는 sale 또는 io', 400);
     }

@@ -755,7 +755,7 @@ function renderLog() {
       : `<span class="chip bg-sky-100 text-sky-800">${r.type||'입출고'}</span>`;
     const right = r.kind === 'sale' ? fmtKRW(r.amount||0) : (r.memo||'');
     const negative = (Number(r.qty)||0) < 0;
-    const isCancel = (r.memo||'').includes('[취소]') || (r.memo||'').includes('[환산]');
+    const isCancel = (r.memo||'').includes('[취소]') || (r.memo||'').includes('[환산]') || (r.memo||'').includes('[취소됨]');
     const cancelBtn = isCancel
       ? '<span class="text-xs text-slate-300">완료</span>'
       : `<button data-cancel-i="${i}" class="text-xs px-2 py-1 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100" title="이 항목을 취소(반대 기록 추가)">✕ 취소</button>`;
