@@ -99,8 +99,11 @@ async function getStockSummary(env) {
       map[i.productId].stockUnits -= units; map[i.productId].sold += units;
     } else if (t === '반품' || t === '출고조정') {
       map[i.productId].stockUnits -= units; map[i.productId].adj -= units;
-    } else if (t === '조정' || t === '재고조정') {
-      // qty 자체가 +/- 되어 있으므로 units를 그대로 더함 (차이만큼 가감)
+    } else if (t === '조정') {
+      // 조정 = 입력 수량만큼 무조건 차감 (빼기)
+      map[i.productId].stockUnits -= Math.abs(units); map[i.productId].adj -= Math.abs(units);
+    } else if (t === '재고조정') {
+      // 이전 구분 호환 (qty 부호대로 가감)
       map[i.productId].stockUnits += units; map[i.productId].adj += units;
     }
   }
@@ -268,8 +271,8 @@ async function appendSales(env, items) {
       let carton = s.stockCarton;
       let safety = 0;
       while (single <= 0 && carton > 0 && safety < 100) {
-        autoRows.push([ts, s.id, s.name, '조정', '보루', -1, '[자동환산] 갑 부족분 자동변환']);
-        autoRows.push([ts, s.id, s.name, '조정', '단일', 10, '[자동환산] 보루 1개 풀어 갑 +10']);
+        autoRows.push([ts, s.id, s.name, '재고조정', '보루', -1, '[자동환산] 갑 부족분 자동변환']);
+        autoRows.push([ts, s.id, s.name, '재고조정', '단일', 10, '[자동환산] 보루 1개 풀어 갑 +10']);
         carton -= 1; single += 10;
         safety++; autoConvertCount++;
       }

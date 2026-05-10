@@ -643,7 +643,7 @@ $('#audit-apply').addEventListener('click', async () => {
     confirmedCount++;
     const d = calcAuditDiff(s);
     if (d !== null && d !== 0) {
-      ops.push({ productId: s.id, type: '조정', unit: '단일', qty: d, memo: '재고조사 차이 자동조정 ' + todayKR() });
+      ops.push({ productId: s.id, type: '재고조정', unit: '단일', qty: d, memo: '재고조사 차이 자동조정 ' + todayKR() });
     }
   });
   if (!confirmedCount) return toast('확정한 상품이 없습니다. 실재고를 입력하고 확정 체크박스를 켜주세요.', 'warn');
