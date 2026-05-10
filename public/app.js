@@ -164,7 +164,7 @@ function renderSuggest(boxEl, items, onPick) {
   boxEl.innerHTML = items.map((p,i) => `
     <button data-idx="${i}" class="w-full text-left px-3 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-0">
       <div class="font-medium text-slate-900">${p.name} <span class="text-xs text-slate-400">${p.maker||''}</span></div>
-      <div class="text-xs text-slate-500">${p.id} · 갑 ${fmtKRW(p.priceSingle)} / 보루 ${fmtKRW(p.priceCarton)}</div>
+      <div class="text-xs text-slate-500">${p.id}${p.maker?(' · '+p.maker):''}</div>
     </button>`).join('');
   boxEl.classList.remove('hidden');
   $$('button', boxEl).forEach(b => b.addEventListener('click', () => onPick(items[+b.dataset.idx])));
@@ -176,7 +176,7 @@ function selectSale(p, unitHint) {
   $('#sale-suggest').classList.add('hidden');
   $('#sale-search').value = `${p.name} (${p.id})`;
   if (unitHint) $('#sale-unit').value = unitHint;
-  $('#sale-selected').textContent = `선택: ${p.name} · 갑 ${fmtKRW(p.priceSingle)} / 보루 ${fmtKRW(p.priceCarton)}`;
+  $('#sale-selected').textContent = `선택: ${p.name}`;
   $('#sale-selected').classList.remove('hidden');
   $('#sale-qty').focus(); $('#sale-qty').select();
 }
@@ -220,8 +220,8 @@ $('#sale-add').addEventListener('click', addToCart);
 function renderCart() {
   const tb = $('#cart-body');
   if (!state.cart.length) {
-    tb.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-slate-400">담긴 상품이 없습니다</td></tr>';
-    $('#cart-total').textContent = '₩0'; $('#cart-count').textContent = '(0)';
+    tb.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-slate-400">담긴 상품이 없습니다</td></tr>';
+    $('#cart-count').textContent = '(0)';
     return;
   }
   tb.innerHTML = state.cart.map((c, i) => `
@@ -229,15 +229,11 @@ function renderCart() {
       <td class="px-3 py-2"><div class="font-medium">${c.name}</div><div class="text-xs text-slate-400">${c.productId}</div></td>
       <td class="px-3 py-2 text-center">${unitLabel(c.unit)}</td>
       <td class="px-3 py-2 text-center">${c.qty}</td>
-      <td class="px-3 py-2 text-right">${fmtKRW(c.unitPrice)}</td>
-      <td class="px-3 py-2 text-right font-semibold">${fmtKRW(c.amount)}</td>
       <td class="px-3 py-2 text-right"><button data-i="${i}" class="cart-del text-rose-500 hover:text-rose-700">삭제</button></td>
     </tr>`).join('');
   $$('.cart-del', tb).forEach(b => b.addEventListener('click', () => {
     state.cart.splice(+b.dataset.i, 1); renderCart();
   }));
-  const total = state.cart.reduce((s,c) => s + c.amount, 0);
-  $('#cart-total').textContent = fmtKRW(total);
   $('#cart-count').textContent = `(${state.cart.length})`;
 }
 $('#cart-clear').addEventListener('click', () => { state.cart = []; renderCart(); });
@@ -744,7 +740,9 @@ function renderLog() {
     (r.name||'').toLowerCase().includes(q) ||
     (r.productId||'').toLowerCase().includes(q)
   );
-  rows.sort((a,b) => (b.datetime||'').localeCompare(a.datetime||''));
+  // 최신순 정렬 (맨 위가 최근) — 문자열 + 타임스탬프 이중 비교로 안전
+  const parseTs = (s) => { const t = Date.parse((s||'').replace(' ', 'T')); return isNaN(t) ? 0 : t; };
+  rows.sort((a,b) => parseTs(b.datetime) - parseTs(a.datetime) || (b.datetime||'').localeCompare(a.datetime||''));
   rows = rows.slice(0, 50);
   $('#log-count').textContent = `(${rows.length})`;
   const tb = $('#log-body');
@@ -753,7 +751,7 @@ function renderLog() {
     const kindBadge = r.kind === 'sale'
       ? '<span class="chip bg-emerald-100 text-emerald-700">판매</span>'
       : `<span class="chip bg-sky-100 text-sky-800">${r.type||'입출고'}</span>`;
-    const right = r.kind === 'sale' ? fmtKRW(r.amount||0) : (r.memo||'');
+    const right = r.memo || '';
     const negative = (Number(r.qty)||0) < 0;
     const isCancel = (r.memo||'').includes('[취소]') || (r.memo||'').includes('[환산]') || (r.memo||'').includes('[취소됨]');
     const cancelBtn = isCancel
@@ -843,22 +841,23 @@ function renderDashboard() {
     byProd[p.id] = { id: p.id, name: p.name, maker: p.maker, discontinued: p.discontinued,
       daily: Object.fromEntries(days.map(d => [d, 0])), week7: 0, monthQty: 0 };
   });
-  let monthAmt = 0, weekAmt = 0, todayAmt = 0;
+  let monthQty = 0, weekQty = 0, todayQty = 0;
   state.sales.forEach(s => {
     const day = (s.datetime||'').slice(0,10);
     const units = (s.unit === '보루' ? s.qty * 10 : s.qty);
-    if (day && day.startsWith(month)) monthAmt += s.amount;
-    if (day >= weekStart) weekAmt += s.amount;
-    if (day === today) todayAmt += s.amount;
+    if (day && day.startsWith(month)) monthQty += units;
+    if (day >= weekStart) weekQty += units;
+    if (day === today) todayQty += units;
     const r = byProd[s.productId]; if (!r) return;
     if (day && day.startsWith(month)) r.monthQty += units;
     if (r.daily[day] !== undefined) { r.daily[day] += units; r.week7 += units; }
   });
 
-  // KPI
-  $('#dash-kpi-month').textContent = fmtKRW(monthAmt);
-  $('#dash-kpi-week').textContent = fmtKRW(weekAmt);
-  $('#dash-kpi-today').textContent = fmtKRW(todayAmt);
+  // KPI (금액 → 갑수 표시)
+  const fmtQty = (n) => (Number(n)||0).toLocaleString('ko-KR') + '갑';
+  $('#dash-kpi-month').textContent = fmtQty(monthQty);
+  $('#dash-kpi-week').textContent = fmtQty(weekQty);
+  $('#dash-kpi-today').textContent = fmtQty(todayQty);
   const lowCount = state.stock.filter(s => s.lowStock && !s.discontinued).length;
   $('#dash-kpi-low').textContent = lowCount;
 
