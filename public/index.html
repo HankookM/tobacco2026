@@ -174,7 +174,6 @@
   <!-- 모드 스위치 -->
   <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-1.5 inline-flex gap-1">
     <button data-mode="list" class="mode-btn px-4 py-2 rounded-xl text-sm font-medium" aria-selected="true">📖 목록</button>
-    <button data-mode="order" class="mode-btn px-4 py-2 rounded-xl text-sm font-medium" aria-selected="false">🛒 발주</button>
     <button data-mode="audit" class="mode-btn px-4 py-2 rounded-xl text-sm font-medium" aria-selected="false">📋 재고조사</button>
   </div>
 
@@ -284,15 +283,14 @@
 <section data-panel="inout" class="space-y-4 hidden">
   <!-- 하위탭 -->
   <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-1.5 inline-flex gap-1 flex-wrap">
-    <button data-subtab="sale" class="subtab-btn px-4 py-2 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100" aria-selected="true">🧾 판매 입력</button>
-    <button data-subtab="io" class="subtab-btn px-4 py-2 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100" aria-selected="false">📥 입출고</button>
+    <button data-subtab="io" class="subtab-btn px-4 py-2 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100" aria-selected="true">📥 입출고</button>
     <button data-subtab="csv" class="subtab-btn px-4 py-2 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100" aria-selected="false">📤 CSV 업로드</button>
     <button data-subtab="newp" class="subtab-btn px-4 py-2 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100" aria-selected="false">➕ 신규 담배</button>
     <button data-subtab="log" class="subtab-btn px-4 py-2 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100" aria-selected="false">📜 최근 기록</button>
   </div>
 
-  <!-- 하위탭 1: 판매 입력 -->
-  <div data-subpanel="sale" class="space-y-4">
+  <!-- 하위탭 1: 판매 입력 (제거됨 — 입출고의 '판매' 구분으로 통합) -->
+  <div data-subpanel="sale" class="space-y-4 hidden" style="display:none">
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
       <div class="flex items-center justify-between mb-3">
         <h2 class="font-semibold text-slate-800">판매 입력</h2>
@@ -341,8 +339,8 @@
     </div>
   </div>
 
-  <!-- 하위탭 2: 입출고 -->
-  <div data-subpanel="io" class="space-y-4 hidden">
+  <!-- 하위탭: 입출고 (기본) -->
+  <div data-subpanel="io" class="space-y-4">
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
       <h2 class="font-semibold mb-3">입출고 등록</h2>
       <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
@@ -361,7 +359,14 @@
           <label class="text-xs text-slate-500">단위</label>
           <select id="io-unit" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-300"><option value="단일">갑</option><option value="보루" selected>보루</option></select>
         </div>
-        <div class="sm:col-span-2">
+        <div class="sm:col-span-1">
+          <label class="text-xs text-slate-500">부호</label>
+          <select id="io-sign" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-300">
+            <option value="+">+</option>
+            <option value="-">-</option>
+          </select>
+        </div>
+        <div class="sm:col-span-1">
           <label class="text-xs text-slate-500">수량</label>
           <input id="io-qty" type="number" min="1" value="1" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-300" />
         </div>
@@ -639,6 +644,6 @@
   // 또는 Cloudflare Pages 대시보드에서 Custom domain 라우팅 사용 시 빈 값 유지
   window.__API_BASE__ = window.__API_BASE__ || "";
 </script>
-<script src="/app.js?v=13"></script>
+<script src="/app.js?v=14"></script>
 </body>
 </html>

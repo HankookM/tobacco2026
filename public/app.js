@@ -673,14 +673,25 @@ $('#io-search').addEventListener('input', (e) => {
   const items = searchProducts(e.target.value);
   renderSuggest($('#io-suggest'), items, selectIO);
 });
+// 구분 변경 시 기본 부호 힌트 (입고:+, 판매/반품:-, 조정:현상유지)
+$('#io-type').addEventListener('change', () => {
+  const t = $('#io-type').value;
+  const signSel = $('#io-sign');
+  if (!signSel) return;
+  if (t === '입고') signSel.value = '+';
+  else if (t === '판매' || t === '반품') signSel.value = '-';
+  // '조정'은 사용자 선택 존중
+});
 $('#io-add').addEventListener('click', () => {
   const p = state.ioSelected;
   if (!p) return toast('상품을 선택하세요', 'warn');
   const type = $('#io-type').value;
   const unit = $('#io-unit').value;
-  const qty = parseInt($('#io-qty').value) || 0;
+  const rawQty = Math.abs(parseInt($('#io-qty').value) || 0);
+  const sign = ($('#io-sign') && $('#io-sign').value === '-') ? -1 : 1;
+  const qty = rawQty * sign;
   const memo = $('#io-memo').value || '';
-  if (qty <= 0) return toast('수량을 입력하세요', 'warn');
+  if (rawQty <= 0) return toast('수량을 입력하세요', 'warn');
   state.ioCart.push({ productId: p.id, name: p.name, type, unit, qty, memo });
   renderIOCart();
   $('#io-search').value=''; $('#io-selected').classList.add('hidden');
@@ -959,6 +970,7 @@ $('#csv-upload').addEventListener('click', async () => {
     toast(`${r.count||0}건 업로드`);
     state.sales = []; state.inout = [];
     await loadStock(true);
+    await loadLog(); // 최근 기록 자동 갱신
   } catch (e) {
     $('#csv-result').innerHTML = `<div class="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700">실패: ${e.message}</div>`;
   }

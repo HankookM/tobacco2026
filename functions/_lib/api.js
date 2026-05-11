@@ -92,19 +92,26 @@ async function getStockSummary(env) {
     if (!map[i.productId]) continue;
     const units = i.unit === '보루' ? i.qty * BORU : i.qty;
     const t = i.type;
-    // 새 구분(입고/판매/반품/조정) + 이전 구분(출고조정/재고조정) 호환
+    // 모든 구분은 qty 부호를 그대로 반영
+    // 프론트에서 입고/조정(+)은 +qty, 판매/반품(-)은 -qty로 들어옴
     if (t === '입고') {
-      map[i.productId].stockUnits += units; map[i.productId].in += units;
+      map[i.productId].stockUnits += units;
+      if (units > 0) map[i.productId].in += units; else map[i.productId].adj += units;
     } else if (t === '판매') {
-      map[i.productId].stockUnits -= units; map[i.productId].sold += units;
-    } else if (t === '반품' || t === '출고조정') {
-      map[i.productId].stockUnits -= units; map[i.productId].adj -= units;
-    } else if (t === '조정') {
-      // 조정 = 입력 수량만큼 무조건 차감 (빼기)
-      map[i.productId].stockUnits -= Math.abs(units); map[i.productId].adj -= Math.abs(units);
-    } else if (t === '재고조정') {
-      // 이전 구분 호환 (qty 부호대로 가감)
-      map[i.productId].stockUnits += units; map[i.productId].adj += units;
+      map[i.productId].stockUnits += units; // 음수면 차감
+      map[i.productId].sold += Math.abs(units);
+    } else if (t === '반품') {
+      // 신규 반품은 부호대로、구 데이터는 양수 기록=차감 호환
+      if (units >= 0) { map[i.productId].stockUnits -= units; map[i.productId].adj -= units; }
+      else { map[i.productId].stockUnits += units; map[i.productId].adj += units; }
+    } else if (t === '출고조정') {
+      // 구 구분: 양수=차감
+      map[i.productId].stockUnits -= Math.abs(units);
+      map[i.productId].adj -= Math.abs(units);
+    } else if (t === '조정' || t === '재고조정') {
+      // qty 부호대로 가감
+      map[i.productId].stockUnits += units;
+      map[i.productId].adj += units;
     }
   }
   return Object.values(map).map((p) => {
